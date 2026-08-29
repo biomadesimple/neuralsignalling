@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SynapseLab · C2.2 Neural Signalling</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0f1416;
+    --panel:#151c1f;
+    --panel2:#1a2226;
+    --grid:#22302c;
+    --line:#2a3438;
+    --text:#edeae0;
+    --muted:#8fa39c;
+    --dim:#5c6b68;
+    --na:#e8a33d;   /* sodium / active accent */
+    --k:#4fb6a8;    /* potassium */
+    --ca:#b98ce0;   /* calcium */
+    --nt:#f2617a;   /* neurotransmitter */
+    --mito:#c97b5a; /* mitochondrion */
+    --er:#5f8fa8;   /* ER / golgi */
+    --good:#7fd48b;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  h1,h2,h3,.display{font-family:'Space Grotesk',system-ui,sans-serif;}
+
+  body::before{
+    content:"";
+    position:fixed; inset:0;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size:34px 34px;
+    opacity:.25;
+    pointer-events:none;
+    z-index:0;
+  }
+
+  header{
+    position:relative; z-index:2;
+    padding:22px clamp(16px,4vw,48px) 0;
+    display:flex; align-items:flex-start; justify-content:space-between; gap:24px;
+    flex-wrap:wrap;
+  }
+  .brand{display:flex; align-items:center; gap:12px;}
+  .brand-mark{width:38px;height:38px;flex:none;}
+  .brand h1{font-size:20px; margin:0; letter-spacing:.02em; font-weight:600;}
+  .brand p{margin:2px 0 0; font-size:12.5px; color:var(--muted); font-family:'IBM Plex Mono',monospace;}
+  #ticker{width:min(360px,40vw); height:44px; background:var(--panel); border:1px solid var(--line); border-radius:8px;}
+
+  nav{
+    position:sticky; top:0; z-index:5;
+    margin-top:20px;
+    background:rgba(15,20,22,.86);
+    backdrop-filter:blur(6px);
+    border-top:1px solid var(--line);
+    border-bottom:1px solid var(--line);
+    display:flex; overflow-x:auto;
+  }
+  nav button{
+    appearance:none; border:none; background:transparent; cursor:pointer;
+    color:var(--muted); font-family:'IBM Plex Mono',monospace; font-size:12.5px;
+    padding:14px clamp(14px,2.4vw,26px); display:flex; align-items:center; gap:10px;
+    border-bottom:2px solid transparent; white-space:nowrap; transition:color .15s, border-color .15s;
+  }
+  nav button .ch{font-size:10px; color:var(--dim); border:1px solid var(--line); border-radius:4px; padding:1px 5px;}
+  nav button:hover{color:var(--text);}
+  nav button.active{color:var(--na); border-color:var(--na);}
+  nav button.active .ch{color:var(--na); border-color:var(--na);}
+
+  main{position:relative; z-index:1; padding:0 clamp(16px,4vw,48px) 80px;}
+  section.view{display:none; padding-top:36px; animation:fade .35s ease;}
+  section.view.active{display:block;}
+  @keyframes fade{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;}}
+
+  .kicker{font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--na); letter-spacing:.08em; text-transform:uppercase; margin:0 0 6px;}
+  h2.title{font-size:clamp(22px,3vw,32px); margin:0 0 8px; font-weight:600;}
+  .lede{color:var(--muted); max-width:680px; font-size:14.5px; line-height:1.6; margin:0 0 28px;}
+
+  .stage{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:clamp(14px,2.4vw,28px);}
+
+  .grid2{display:grid; grid-template-columns:1.6fr 1fr; gap:20px;}
+  @media(max-width:880px){.grid2{grid-template-columns:1fr;}}
+
+  .info-panel{background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:18px 20px; min-height:180px;}
+  .info-panel .ph{color:var(--na); font-family:'IBM Plex Mono',monospace; font-size:11px; text-transform:uppercase; letter-spacing:.06em;}
+  .info-panel h3{margin:6px 0 8px; font-size:17px;}
+  .info-panel p{margin:0; font-size:13.5px; line-height:1.65; color:#cfd3ce;}
+  .hint{color:var(--dim); font-size:12.5px; font-family:'IBM Plex Mono',monospace; margin-top:10px;}
+
+  .part{cursor:pointer;}
+  .part *{transition:fill .18s, stroke .18s, opacity .18s;}
+  .part:hover .hitshape, .part.active .hitshape{filter:brightness(1.22);}
+  .part-label{font-family:'IBM Plex Mono',monospace; font-size:10px; fill:var(--muted); pointer-events:none;}
+  .part.active .part-label{fill:var(--na);}
+
+  svg{width:100%; height:auto; display:block;}
+
+  .btnrow{display:flex; flex-wrap:wrap; gap:10px; margin-top:18px; align-items:center;}
+  button.action{
+    font-family:'IBM Plex Mono',monospace; font-size:12.5px;
+    background:transparent; color:var(--text); border:1px solid var(--line);
+    padding:9px 16px; border-radius:6px; cursor:pointer; transition:.15s;
+  }
+  button.action:hover{border-color:var(--na); color:var(--na);}
+  button.action.primary{background:var(--na); color:#1a1408; border-color:var(--na); font-weight:600;}
+  button.action.primary:hover{filter:brightness(1.08); color:#1a1408;}
+  button.action:disabled{opacity:.32; cursor:not-allowed; border-color:var(--line); color:var(--dim);}
+  input[type=range]{accent-color:var(--na); width:160px;}
+  .field{display:flex; align-items:center; gap:8px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--muted);}
+  .readout{font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--k);}
+
+  .legend{display:flex; flex-wrap:wrap; gap:14px; margin-top:14px; font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--muted);}
+  .legend span{display:inline-flex; align-items:center; gap:6px;}
+  .dot{width:9px;height:9px;border-radius:50%; display:inline-block;}
+
+  footer{
+    position:relative; z-index:1; border-top:1px solid var(--line); padding:22px clamp(16px,4vw,48px);
+    color:var(--dim); font-family:'IBM Plex Mono',monospace; font-size:11.5px;
+    display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;
+  }
+
+  /* ---- Module 2 : conduction track ---- */
+  .track-wrap{margin-bottom:26px;}
+  .track-head{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;}
+  .track-head h4{margin:0; font-size:13.5px; font-weight:600;}
+  .track-head .t{font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--k);}
+  .track{position:relative; height:70px; background:var(--panel2); border:1px solid var(--line); border-radius:8px; overflow:hidden;}
+  .axon-line{position:absolute; left:4%; right:4%; top:50%; height:6px; transform:translateY(-50%); background:var(--line); border-radius:3px;}
+  .segment{position:absolute; top:50%; height:20px; transform:translateY(-50%); border-radius:9px; background:#26343a; border:1px solid var(--line);}
+  .node{position:absolute; top:50%; width:8px; height:8px; border-radius:50%; background:var(--bg); border:1.5px solid var(--dim); transform:translate(-50%,-50%);}
+  .impulse{
+    position:absolute; top:50%; width:16px; height:16px; border-radius:50%;
+    background:radial-gradient(circle, var(--na), rgba(232,163,61,0));
+    box-shadow:0 0 14px 4px rgba(232,163,61,.55); transform:translate(-50%,-50%); left:4%;
+  }
+  .wake{position:absolute; top:50%; height:6px; background:linear-gradient(90deg, rgba(232,163,61,.55), rgba(232,163,61,0)); transform:translateY(-50%); border-radius:3px; width:0;}
+
+  /* ---- Module 3 : AP graph + stepper ---- */
+  #apCanvas{width:100%; height:280px; display:block; background:var(--panel2); border:1px solid var(--line); border-radius:8px;}
+  .steplabel{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--dim); letter-spacing:.05em; text-transform:uppercase;}
+  .channels{display:flex; gap:14px; margin-top:16px; flex-wrap:wrap;}
+  .chan{flex:1; min-width:160px; background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:12px 14px; transition:border-color .2s;}
+  .chan.on{border-color:currentColor;}
+  .chan .name{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;}
+  .chan .state{font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px; margin-top:4px; transition:color .2s;}
+  .chan .gatebar{margin-top:8px; height:6px; border-radius:3px; background:var(--line); overflow:hidden;}
+  .chan .gatebar i{display:block; height:100%; width:0%; transition:width .5s ease, background .3s;}
+
+  /* ---- Module 4 : synapse ---- */
+  .steps{display:flex; flex-wrap:wrap; gap:8px; margin:18px 0;}
+  .steps button{
+    font-family:'IBM Plex Mono',monospace; font-size:11.5px; padding:7px 12px; border-radius:5px;
+    border:1px solid var(--line); background:transparent; color:var(--dim); cursor:pointer; transition:.15s;
+  }
+  .steps button.done{color:var(--muted); border-color:var(--line);}
+  .steps button.active{color:var(--bg); background:var(--na); border-color:var(--na); font-weight:600;}
+
+  .ion{opacity:0; transition:opacity 1.5s ease, transform 1.6s cubic-bezier(.4,0,.2,1);}
+  .glow{transition:opacity .5s, filter .5s;}
+  .vesicle{transition:opacity 1.2s ease, transform 1.3s cubic-bezier(.4,0,.2,1), r 1s ease;}
+
+  /* ---- Module 3 : membrane cross-section ---- */
+  #membraneSVG{background:var(--panel2); border:1px solid var(--line); border-radius:8px; margin-top:16px;}
+  .mion{transition:opacity .8s ease, transform .9s cubic-bezier(.4,0,.2,1);}
+  .gaterect{transition:stroke .3s, filter .3s;}
+  .porerect{transition:opacity .3s;}
+
+  @media(max-width:600px){ nav button span.full{display:none;} }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <svg class="brand-mark" viewBox="0 0 40 40" fill="none">
+      <circle cx="20" cy="20" r="19" stroke="var(--na)" stroke-width="1.4" opacity=".5"/>
+      <path d="M8 24 L15 24 L18 14 L22 30 L25 20 L32 20" stroke="var(--na)" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div>
+      <h1>SynapseLab</h1>
+      <p>IB DP Biology · C2.2 Neural signalling</p>
+    </div>
+  </div>
+  <canvas id="ticker"></canvas>
+</header>
+
+<nav id="nav">
+  <button class="active" data-view="v1"><span class="ch">CH1</span><span class="full">Neuron structure</span></button>
+  <button data-view="v2"><span class="ch">CH2</span><span class="full">Impulse conduction</span></button>
+  <button data-view="v3"><span class="ch">CH3</span><span class="full">Action potential</span></button>
+  <button data-view="v4"><span class="ch">CH4</span><span class="full">Synaptic transmission</span></button>
+</nav>
+
+<main>
+
+<!-- ===================== MODULE 1 ===================== -->
+<section class="view active" id="v1">
+  <p class="kicker">Channel 01</p>
+  <h2 class="title">Parts of a neuron</h2>
+  <p class="lede">This is drawn close to what a motor neuron actually looks like under the microscope — not just the textbook outline. Click (or hover) on any structure, right down to the organelles inside the cell body, to see what it's called and what it does.</p>
+
+  <div class="stage grid2">
+    <div>
+      <svg viewBox="0 0 1000 480" id="neuronSVG">
+
+        <!-- ===== dendrites (multi-order branching + spines) ===== -->
+        <g class="part" data-part="dendrites">
+          <title>Dendrites</title>
+          <g class="hitshape" stroke="#7f9490" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M118 208 C88 182 68 152 48 112"/>
+            <path d="M68 152 C54 142 40 146 30 130"/>
+            <path d="M68 152 C58 166 44 170 34 180"/>
+            <path d="M106 234 C70 224 40 220 14 214"/>
+            <path d="M40 220 C30 206 20 210 10 200"/>
+            <path d="M40 220 C26 232 16 234 6 244"/>
+            <path d="M118 268 C90 290 64 310 40 330"/>
+            <path d="M64 310 C56 326 40 326 30 336"/>
+            <path d="M64 310 C70 330 60 340 55 352"/>
+          </g>
+          <text class="part-label" x="10" y="96">dendrites</text>
+        </g>
+        <g class="part" data-part="spines">
+          <title>Dendritic spines</title>
+          <g class="hitshape" fill="#8fbf9e" stroke="none">
+            <circle cx="63" cy="146" r="3"/><circle cx="52" cy="163" r="3"/>
+            <circle cx="35" cy="214" r="3"/><circle cx="22" cy="226" r="3"/>
+            <circle cx="70" cy="298" r="3"/><circle cx="52" cy="318" r="3"/>
+          </g>
+        </g>
+
+        <!-- ===== soma (irregular, realistic blob) ===== -->
+        <g class="part" data-part="soma">
+          <title>Cell body (soma)</title>
+          <path class="hitshape" d="M172 188 C202 178 228 194 233 224 C238 254 224 280 193 289
+                   C161 298 128 286 114 258 C101 230 108 199 136 189 C148 184 160 186 172 188 Z"
+                fill="#233129" stroke="#7f9490" stroke-width="2.5"/>
+          <text class="part-label" x="112" y="312">cell body (soma)</text>
+        </g>
+
+        <!-- nucleus + nucleolus -->
+        <g class="part" data-part="nucleus">
+          <title>Nucleus</title>
+          <ellipse class="hitshape" cx="176" cy="234" rx="30" ry="26" fill="#3a4d40" stroke="#9fb5ad" stroke-width="2"/>
+        </g>
+        <g class="part" data-part="nucleolus">
+          <title>Nucleolus</title>
+          <circle class="hitshape" cx="186" cy="226" r="6" fill="#5c7a68" stroke="#9fb5ad" stroke-width="1.2"/>
+        </g>
+
+        <!-- rough ER -->
+        <g class="part" data-part="rough_er">
+          <title>Rough endoplasmic reticulum</title>
+          <g class="hitshape" fill="none" stroke="var(--er)" stroke-width="1.6" stroke-linecap="round">
+            <path d="M122 268 q7,-9 14,0 q7,9 14,0 q7,-9 14,0"/>
+            <path d="M120 277 q7,-9 14,0 q7,9 14,0 q7,-9 14,0"/>
+            <path d="M122 286 q7,-9 14,0 q7,9 14,0 q7,-9 14,0"/>
+          </g>
+        </g>
+
+        <!-- golgi apparatus -->
+        <g class="part" data-part="golgi">
+          <title>Golgi apparatus</title>
+          <g class="hitshape" fill="none" stroke="#8f7ec9" stroke-width="1.8" stroke-linecap="round">
+            <path d="M198 197 q16,-7 32,0"/>
+            <path d="M200 204 q16,-7 32,0"/>
+            <path d="M202 211 q16,-7 32,0"/>
+            <path d="M204 218 q16,-7 32,0"/>
+          </g>
+        </g>
+
+        <!-- mitochondria (soma + along axon) -->
+        <g class="part" data-part="mitochondria">
+          <title>Mitochondrion</title>
+          <g class="hitshape">
+            <g fill="#4a352c" stroke="var(--mito)" stroke-width="1.4">
+              <ellipse cx="146" cy="303" rx="15" ry="8" transform="rotate(-18 146 303)"/>
+              <ellipse cx="207" cy="272" rx="14" ry="7.5" transform="rotate(12 207 272)"/>
+              <ellipse cx="430" cy="256" rx="15" ry="7.5"/>
+              <ellipse cx="640" cy="256" rx="15" ry="7.5"/>
+            </g>
+            <g stroke="var(--mito)" stroke-width="1" fill="none" opacity=".8">
+              <path d="M136 303 q5,-5 10,0 q5,5 10,0"/>
+              <path d="M198 272 q5,-4 9,0 q5,4 9,0"/>
+              <path d="M420 256 q5,-4 10,0 q5,4 10,0"/>
+              <path d="M630 256 q5,-4 10,0 q5,4 10,0"/>
+            </g>
+          </g>
+        </g>
+
+        <!-- axon hillock -->
+        <g class="part" data-part="hillock">
+          <title>Axon hillock</title>
+          <path class="hitshape" d="M231 233 L262 220 L262 250 Z" fill="#2c3a33" stroke="#7f9490" stroke-width="2"/>
+          <text class="part-label" x="222" y="196">axon hillock</text>
+        </g>
+
+        <!-- axon core -->
+        <line x1="262" y1="236" x2="770" y2="236" stroke="#4a5a54" stroke-width="4"/>
+
+        <!-- myelin segments + Schwann-cell nuclei -->
+        <g class="part" data-part="myelin">
+          <title>Myelin sheath</title>
+          <g class="hitshape" fill="#33473f" stroke="#6d9c88" stroke-width="1.6">
+            <rect x="270" y="220" width="66" height="32" rx="15"/>
+            <rect x="350" y="220" width="66" height="32" rx="15"/>
+            <rect x="430" y="220" width="66" height="32" rx="15"/>
+            <rect x="510" y="220" width="66" height="32" rx="15"/>
+            <rect x="590" y="220" width="66" height="32" rx="15"/>
+            <rect x="670" y="220" width="66" height="32" rx="15"/>
+          </g>
+          <text class="part-label" x="345" y="200">myelin sheath</text>
+        </g>
+        <g class="part" data-part="schwann">
+          <title>Schwann cell nucleus</title>
+          <g class="hitshape" fill="#caa851" stroke="#8a733a" stroke-width="1">
+            <ellipse cx="303" cy="210" rx="10" ry="5"/>
+            <ellipse cx="383" cy="210" rx="10" ry="5"/>
+            <ellipse cx="463" cy="210" rx="10" ry="5"/>
+            <ellipse cx="543" cy="210" rx="10" ry="5"/>
+            <ellipse cx="623" cy="210" rx="10" ry="5"/>
+            <ellipse cx="703" cy="210" rx="10" ry="5"/>
+          </g>
+        </g>
+        <g class="part" data-part="node">
+          <title>Node of Ranvier</title>
+          <g class="hitshape" fill="var(--bg)" stroke="#c8b46a" stroke-width="2">
+            <circle cx="343" cy="236" r="6"/><circle cx="423" cy="236" r="6"/><circle cx="503" cy="236" r="6"/>
+            <circle cx="583" cy="236" r="6"/><circle cx="663" cy="236" r="6"/>
+          </g>
+          <text class="part-label" x="400" y="278">nodes of Ranvier</text>
+        </g>
+
+        <!-- axon terminal branches + boutons + vesicles -->
+        <g class="part" data-part="terminal">
+          <title>Axon terminal (synaptic bouton)</title>
+          <g class="hitshape" stroke="#7f9490" stroke-width="2.6" fill="none" stroke-linecap="round">
+            <path d="M770 236 C800 210 815 180 838 160"/>
+            <path d="M770 236 C800 226 820 214 848 210"/>
+            <path d="M770 236 C800 246 822 258 848 268"/>
+            <path d="M770 236 C800 262 815 296 838 320"/>
+          </g>
+          <g class="hitshape" fill="#3a4d40" stroke="#9fb5ad" stroke-width="2">
+            <circle cx="838" cy="160" r="15"/><circle cx="848" cy="210" r="15"/>
+            <circle cx="848" cy="268" r="15"/><circle cx="838" cy="320" r="15"/>
+          </g>
+          <text class="part-label" x="770" y="120">axon terminals</text>
+        </g>
+        <g class="part" data-part="vesicles">
+          <title>Synaptic vesicles</title>
+          <g class="hitshape" fill="var(--nt)" opacity=".85">
+            <circle cx="833" cy="155" r="2.6"/><circle cx="842" cy="163" r="2.6"/><circle cx="836" cy="166" r="2.6"/>
+            <circle cx="843" cy="205" r="2.6"/><circle cx="852" cy="213" r="2.6"/><circle cx="846" cy="216" r="2.6"/>
+            <circle cx="843" cy="263" r="2.6"/><circle cx="852" cy="271" r="2.6"/><circle cx="846" cy="274" r="2.6"/>
+            <circle cx="833" cy="315" r="2.6"/><circle cx="842" cy="323" r="2.6"/><circle cx="836" cy="326" r="2.6"/>
+          </g>
+        </g>
+
+        <!-- faint next-cell hint -->
+        <g opacity=".55">
+          <line x1="876" y1="140" x2="876" y2="340" stroke="#3a4a46" stroke-width="3" stroke-dasharray="2 5"/>
+          <text class="part-label" x="884" y="244">to next neuron / effector</text>
+        </g>
+      </svg>
+      <p class="hint">Tap / click any structure — try the small organelles inside the cell body too.</p>
+    </div>
+
+    <div class="info-panel" id="infoPanel">
+      <p class="ph">Select a structure</p>
+      <h3>Nothing selected yet</h3>
+      <p>Click any part of the neuron on the left — dendrites and organelles first, then follow the impulse's path along the axon to the terminals.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== MODULE 2 ===================== -->
+<section class="view" id="v2">
+  <p class="kicker">Channel 02</p>
+  <h2 class="title">How an impulse travels along a neuron</h2>
+  <p class="lede">An action potential doesn't move like a wave in water — it is <em>regenerated</em> along the axon membrane. In a myelinated axon it can skip straight between nodes of Ranvier (saltatory conduction); in an unmyelinated axon it must regenerate at every point along the membrane. Press play and compare.</p>
+
+  <div class="stage">
+    <div class="track-wrap">
+      <div class="track-head"><h4>Myelinated axon — saltatory conduction</h4><span class="t mono" id="t1">0 ms</span></div>
+      <div class="track" id="track1">
+        <div class="axon-line"></div>
+        <div class="segment" style="left:6%; width:16%;"></div>
+        <div class="segment" style="left:26%; width:16%;"></div>
+        <div class="segment" style="left:46%; width:16%;"></div>
+        <div class="segment" style="left:66%; width:16%;"></div>
+        <div class="segment" style="left:86%; width:10%;"></div>
+        <div class="node" style="left:24%;"></div>
+        <div class="node" style="left:44%;"></div>
+        <div class="node" style="left:64%;"></div>
+        <div class="node" style="left:84%;"></div>
+        <div class="impulse" id="dot1"></div>
+      </div>
+    </div>
+
+    <div class="track-wrap" style="margin-bottom:6px;">
+      <div class="track-head"><h4>Unmyelinated axon — continuous conduction</h4><span class="t mono" id="t2">0 ms</span></div>
+      <div class="track" id="track2">
+        <div class="axon-line"></div>
+        <div class="wake" id="wake2" style="left:4%;"></div>
+        <div class="impulse" id="dot2"></div>
+      </div>
+    </div>
+
+    <div class="btnrow">
+      <button class="action primary" id="playBtn">▶ Run comparison</button>
+      <button class="action" id="resetBtn">Reset</button>
+      <div class="field">Speed <input type="range" id="speed" min="0.5" max="2" step="0.1" value="1"></div>
+      <span class="readout" id="raceResult"></span>
+    </div>
+
+    <p class="hint" style="margin-top:16px;">Myelin (an insulating, lipid-rich sheath) prevents ion leakage across the membrane, so the depolarization only needs to "jump" — regenerate — at the exposed nodes of Ranvier. This makes conduction much faster than in an unmyelinated axon, where every patch of membrane must depolarize in turn.</p>
+  </div>
+</section>
+
+<!-- ===================== MODULE 3 ===================== -->
+<section class="view" id="v3">
+  <p class="kicker">Channel 03</p>
+  <h2 class="title">The action potential</h2>
+  <p class="lede">A neuron only fires if a stimulus depolarizes the membrane past threshold (around −55 mV). Below threshold, nothing propagates. At or above it, a full, identical action potential fires every time — the <em>all-or-nothing principle</em>. Set a stimulus strength, fire it, then step through each phase at your own pace.</p>
+
+  <div class="stage">
+    <div class="btnrow" style="margin-top:0;">
+      <div class="field">Stimulus strength
+        <input type="range" id="stim" min="0" max="100" value="20">
+        <span class="readout" id="stimVal">20%</span>
+      </div>
+      <button class="action primary" id="fireBtn">⚡ Stimulate</button>
+      <button class="action" id="apReset">Reset</button>
+    </div>
+
+    <canvas id="apCanvas" style="margin-top:16px;"></canvas>
+
+    <p class="hint" style="margin-top:12px;">The graph above shows the whole-neuron picture; the diagram below shows what's happening at the membrane itself — which channels are open, and which way ions are moving.</p>
+    <svg viewBox="0 0 400 210" id="membraneSVG">
+      <text class="part-label" x="12" y="20">extracellular fluid — high Na⁺</text>
+      <text class="part-label" x="12" y="200">intracellular fluid — high K⁺</text>
+
+      <rect x="20" y="85" width="360" height="34" fill="#1c2622" stroke="#3a4a46"/>
+      <g fill="#2c3a33">
+        <circle cx="32" cy="85" r="3"/><circle cx="48" cy="85" r="3"/><circle cx="64" cy="85" r="3"/><circle cx="80" cy="85" r="3"/>
+        <circle cx="150" cy="85" r="3"/><circle cx="166" cy="85" r="3"/><circle cx="182" cy="85" r="3"/>
+        <circle cx="262" cy="85" r="3"/><circle cx="278" cy="85" r="3"/><circle cx="294" cy="85" r="3"/>
+        <circle cx="368" cy="85" r="3"/>
+        <circle cx="32" cy="119" r="3"/><circle cx="48" cy="119" r="3"/><circle cx="64" cy="119" r="3"/><circle cx="80" cy="119" r="3"/>
+        <circle cx="150" cy="119" r="3"/><circle cx="166" cy="119" r="3"/><circle cx="182" cy="119" r="3"/>
+        <circle cx="262" cy="119" r="3"/><circle cx="278" cy="119" r="3"/><circle cx="294" cy="119" r="3"/>
+        <circle cx="368" cy="119" r="3"/>
+      </g>
+
+      <!-- Na+ channel -->
+      <rect id="naGateRect" class="gaterect" x="92" y="79" width="28" height="46" rx="5" fill="#2c3a33" stroke="var(--dim)" stroke-width="2.2"/>
+      <rect id="naPore" class="porerect" x="102" y="79" width="8" height="46" fill="var(--bg)" opacity="0"/>
+      <text class="part-label" x="66" y="146" fill="var(--na)">Na⁺ channel</text>
+
+      <!-- K+ channel -->
+      <rect id="kGateRect" class="gaterect" x="220" y="79" width="28" height="46" rx="5" fill="#2c3a33" stroke="var(--dim)" stroke-width="2.2"/>
+      <rect id="kPore" class="porerect" x="230" y="79" width="8" height="46" fill="var(--bg)" opacity="0"/>
+      <text class="part-label" x="197" y="146" fill="var(--k)">K⁺ channel</text>
+
+      <!-- pump -->
+      <rect id="pumpGateRect" class="gaterect" x="322" y="79" width="34" height="46" rx="7" fill="#2c3a33" stroke="var(--dim)" stroke-width="2.2"/>
+      <text class="part-label" x="298" y="146" fill="var(--muted)">Na⁺/K⁺ pump</text>
+
+      <!-- Na+ ions, outside -->
+      <g id="naIonsGrp">
+        <circle class="mion" data-i="0" cx="52" cy="30" r="6.5" fill="var(--na)"/>
+        <circle class="mion" data-i="1" cx="74" cy="42" r="6.5" fill="var(--na)"/>
+        <circle class="mion" data-i="2" cx="96" cy="28" r="6.5" fill="var(--na)"/>
+        <circle class="mion" data-i="3" cx="120" cy="40" r="6.5" fill="var(--na)"/>
+      </g>
+      <!-- K+ ions, inside -->
+      <g id="kIonsGrp">
+        <circle class="mion" data-i="0" cx="212" cy="168" r="6.5" fill="var(--k)"/>
+        <circle class="mion" data-i="1" cx="234" cy="180" r="6.5" fill="var(--k)"/>
+        <circle class="mion" data-i="2" cx="256" cy="168" r="6.5" fill="var(--k)"/>
+        <circle class="mion" data-i="3" cx="278" cy="180" r="6.5" fill="var(--k)"/>
+      </g>
+    </svg>
+
+    <div class="grid2" style="margin-top:16px; align-items:start;">
+      <div class="info-panel" id="phasePanel">
+        <p class="ph steplabel" id="phaseCount">Phase 1 / 3</p>
+        <h3 id="phaseTitle">Resting potential</h3>
+        <p id="phaseDesc">Set a stimulus strength above and press Stimulate to begin.</p>
+      </div>
+      <div>
+        <div class="channels" style="margin-top:0; flex-direction:column;">
+          <div class="chan" id="naCard">
+            <div class="name">Voltage-gated Na⁺ channels</div>
+            <div class="state" id="naState" style="color:var(--dim)">Closed</div>
+            <div class="gatebar"><i id="naBar" style="background:var(--na)"></i></div>
+          </div>
+          <div class="chan" id="kCard">
+            <div class="name">Voltage-gated K⁺ channels</div>
+            <div class="state" id="kState" style="color:var(--dim)">Closed</div>
+            <div class="gatebar"><i id="kBar" style="background:var(--k)"></i></div>
+          </div>
+          <div class="chan" id="pumpCard">
+            <div class="name">Na⁺/K⁺ pump</div>
+            <div class="state" id="pumpState" style="color:var(--dim)">Standing by</div>
+            <div class="gatebar"><i id="pumpBar" style="background:var(--muted); width:20%;"></i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="btnrow">
+      <button class="action" id="apPrev" disabled>◀ Previous</button>
+      <button class="action primary" id="apNext" disabled>Next ▶</button>
+      <button class="action" id="apPlay" disabled>▶ Play through (slow)</button>
+    </div>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--na)"></i>Na⁺ influx → depolarization</span>
+      <span><i class="dot" style="background:var(--k)"></i>K⁺ efflux → repolarization</span>
+      <span><i class="dot" style="background:#556"></i>Threshold ≈ −55 mV</span>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== MODULE 4 ===================== -->
+<section class="view" id="v4">
+  <p class="kicker">Channel 04</p>
+  <h2 class="title">Synaptic transmission</h2>
+  <p class="lede">A synapse converts an electrical signal into a brief chemical one, then back into an electrical one in the next cell. Step through the sequence below at your own pace, or watch it play through slowly.</p>
+
+  <div class="stage">
+    <div class="steps" id="stepButtons"></div>
+
+    <svg viewBox="0 0 900 440" id="synapseSVG">
+      <!-- presynaptic membrane: phospholipid bilayer -->
+      <g id="preMembraneGroup">
+        <path d="M50 150 Q450 108 850 150" stroke="#4a5a54" stroke-width="10" fill="none" class="glow" id="preMembrane" opacity=".9"/>
+        <g id="preHeads" fill="#33473f">
+          <circle cx="90" cy="146" r="3.4"/><circle cx="150" cy="138" r="3.4"/><circle cx="210" cy="130" r="3.4"/>
+          <circle cx="270" cy="123" r="3.4"/><circle cx="330" cy="117" r="3.4"/><circle cx="390" cy="112" r="3.4"/>
+          <circle cx="450" cy="109" r="3.4"/><circle cx="510" cy="112" r="3.4"/><circle cx="570" cy="117" r="3.4"/>
+          <circle cx="630" cy="123" r="3.4"/><circle cx="690" cy="130" r="3.4"/><circle cx="750" cy="138" r="3.4"/><circle cx="810" cy="146" r="3.4"/>
+        </g>
+      </g>
+      <text class="part-label" x="30" y="95">presynaptic neuron — axon terminal</text>
+
+      <!-- mitochondrion for realism -->
+      <g id="mitoSyn" opacity=".9">
+        <ellipse cx="130" cy="195" rx="24" ry="13" fill="#4a352c" stroke="var(--mito)" stroke-width="1.6" transform="rotate(-8 130 195)"/>
+        <path d="M112 195 q5,-6 10,0 q5,6 10,0 q5,-6 10,0" stroke="var(--mito)" stroke-width="1" fill="none" opacity=".85"/>
+        <text class="part-label" x="98" y="232">mitochondrion</text>
+      </g>
+
+      <!-- Ca2+ channels on presynaptic membrane -->
+      <g id="caChannels">
+        <rect x="300" y="140" width="16" height="20" rx="3" fill="#3a4d40" stroke="var(--ca)" stroke-width="2" class="glow"/>
+        <rect x="580" y="140" width="16" height="20" rx="3" fill="#3a4d40" stroke="var(--ca)" stroke-width="2" class="glow"/>
+        <text class="part-label" x="335" y="102" fill="var(--ca)">voltage-gated Ca²⁺ channels</text>
+      </g>
+
+      <!-- reserve pool vesicles (further from membrane) -->
+      <g id="reserveVesicles">
+        <circle class="vesicle" cx="230" cy="205" r="15" fill="#2c3a33" stroke="var(--nt)" stroke-width="1.6"/>
+        <circle class="vesicle" cx="660" cy="210" r="15" fill="#2c3a33" stroke="var(--nt)" stroke-width="1.6"/>
+        <text class="part-label" x="203" y="244" fill="var(--dim)">reserve pool</text>
+      </g>
+
+      <!-- docked vesicles near membrane -->
+      <g id="vesicles">
+        <circle class="vesicle" cx="330" cy="210" r="18" fill="#2c3a33" stroke="var(--nt)" stroke-width="1.8" id="ves1"/>
+        <circle class="vesicle" cx="410" cy="204" r="18" fill="#2c3a33" stroke="var(--nt)" stroke-width="1.8" id="ves2"/>
+        <circle class="vesicle" cx="490" cy="204" r="18" fill="#2c3a33" stroke="var(--nt)" stroke-width="1.8" id="ves3"/>
+        <circle class="vesicle" cx="570" cy="210" r="18" fill="#2c3a33" stroke="var(--nt)" stroke-width="1.8" id="ves4"/>
+        <text class="part-label" x="395" y="176" fill="var(--dim)">docked vesicles</text>
+      </g>
+
+      <!-- calcium ions -->
+      <g id="caIons">
+        <circle class="ion" data-role="ca" cx="300" cy="40" r="5" fill="var(--ca)"/>
+        <circle class="ion" data-role="ca" cx="590" cy="40" r="5" fill="var(--ca)"/>
+        <circle class="ion" data-role="ca" cx="315" cy="58" r="5" fill="var(--ca)"/>
+        <circle class="ion" data-role="ca" cx="575" cy="58" r="5" fill="var(--ca)"/>
+      </g>
+
+      <!-- neurotransmitter molecules released into cleft -->
+      <g id="ntMolecules">
+        <circle class="ion" data-role="nt" cx="330" cy="228" r="6" fill="var(--nt)"/>
+        <circle class="ion" data-role="nt" cx="345" cy="242" r="6" fill="var(--nt)"/>
+        <circle class="ion" data-role="nt" cx="410" cy="222" r="6" fill="var(--nt)"/>
+        <circle class="ion" data-role="nt" cx="425" cy="238" r="6" fill="var(--nt)"/>
+        <circle class="ion" data-role="nt" cx="490" cy="222" r="6" fill="var(--nt)"/>
+        <circle class="ion" data-role="nt" cx="505" cy="238" r="6" fill="var(--nt)"/>
+        <circle class="ion" data-role="nt" cx="570" cy="228" r="6" fill="var(--nt)"/>
+        <circle class="ion" data-role="nt" cx="585" cy="242" r="6" fill="var(--nt)"/>
+      </g>
+
+      <!-- synaptic cleft label -->
+      <text class="part-label" x="405" y="278" fill="var(--dim)">synaptic cleft (≈ 20 nm)</text>
+
+      <!-- postsynaptic membrane: bilayer -->
+      <g id="postMembraneGroup">
+        <path d="M50 320 Q450 362 850 320" stroke="#4a5a54" stroke-width="10" fill="none" class="glow" id="postMembrane" opacity=".9"/>
+        <g id="postHeads" fill="#33473f">
+          <circle cx="90" cy="325" r="3.4"/><circle cx="150" cy="333" r="3.4"/><circle cx="210" cy="340" r="3.4"/>
+          <circle cx="270" cy="347" r="3.4"/><circle cx="330" cy="352" r="3.4"/><circle cx="390" cy="356" r="3.4"/>
+          <circle cx="450" cy="358" r="3.4"/><circle cx="510" cy="356" r="3.4"/><circle cx="570" cy="352" r="3.4"/>
+          <circle cx="630" cy="347" r="3.4"/><circle cx="690" cy="340" r="3.4"/><circle cx="750" cy="333" r="3.4"/><circle cx="810" cy="325" r="3.4"/>
+        </g>
+      </g>
+      <text class="part-label" x="30" y="400">postsynaptic neuron</text>
+
+      <!-- receptors -->
+      <g id="receptors">
+        <rect x="323" y="308" width="16" height="20" rx="3" fill="#3a4d40" stroke="var(--nt)" stroke-width="2" class="glow" id="rec1"/>
+        <rect x="403" y="304" width="16" height="20" rx="3" fill="#3a4d40" stroke="var(--nt)" stroke-width="2" class="glow" id="rec2"/>
+        <rect x="483" y="304" width="16" height="20" rx="3" fill="#3a4d40" stroke="var(--nt)" stroke-width="2" class="glow" id="rec3"/>
+        <rect x="563" y="308" width="16" height="20" rx="3" fill="#3a4d40" stroke="var(--nt)" stroke-width="2" class="glow" id="rec4"/>
+        <text class="part-label" x="340" y="386" fill="var(--nt)">receptor (ligand-gated Na⁺ channel)</text>
+      </g>
+
+      <!-- sodium ions entering postsynaptic cell -->
+      <g id="naIons">
+        <circle class="ion" data-role="na" cx="330" cy="345" r="5" fill="var(--na)"/>
+        <circle class="ion" data-role="na" cx="410" cy="350" r="5" fill="var(--na)"/>
+        <circle class="ion" data-role="na" cx="490" cy="350" r="5" fill="var(--na)"/>
+        <circle class="ion" data-role="na" cx="570" cy="345" r="5" fill="var(--na)"/>
+      </g>
+
+      <!-- enzyme / reuptake transporter for termination step -->
+      <g id="clearanceGroup">
+        <rect x="440" y="168" width="20" height="16" rx="3" fill="#3a4d40" stroke="var(--good)" stroke-width="1.8" class="glow" id="enzyme"/>
+        <text class="part-label" x="470" y="158" fill="var(--good)">enzyme / reuptake transporter</text>
+      </g>
+    </svg>
+
+    <div class="info-panel" id="synInfo" style="margin-top:8px;">
+      <p class="ph" id="synPh">Step 1 / 6</p>
+      <h3 id="synTitle">Action potential arrives</h3>
+      <p id="synBody">An action potential reaches the axon terminal and depolarizes the presynaptic membrane.</p>
+    </div>
+
+    <div class="btnrow">
+      <button class="action" id="prevStep">◀ Previous</button>
+      <button class="action primary" id="nextStep">Next ▶</button>
+      <button class="action" id="playSyn">▶ Play all (slow)</button>
+      <button class="action" id="resetSyn">Reset</button>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <span>SynapseLab — a set of interactive simulators for abstract biology concepts.</span>
+  <span>Built for IB DP Biology, syllabus topic C2.2</span>
+</footer>
+
+<script>
+/* ============================================================
+   NAV
+   ============================================================ */
+const navButtons = document.querySelectorAll('nav button');
+navButtons.forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    navButtons.forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('section.view').forEach(s=>s.classList.remove('active'));
+    document.getElementById(btn.dataset.view).classList.add('active');
+    window.scrollTo({top:0, behavior:'smooth'});
+  });
+});
+
+/* ============================================================
+   HEADER TICKER
+   ============================================================ */
+(function(){
+  const c = document.getElementById('ticker');
+  const ctx = c.getContext('2d');
+  let w,h;
+  function fit(){ w=c.clientWidth; h=c.clientHeight; c.width=w*devicePixelRatio; c.height=h*devicePixelRatio; ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); }
+  fit(); window.addEventListener('resize', fit);
+  let t0 = performance.now();
+  function spikeShape(x){
+    const period = 90; const p = x % period;
+    if(p>10 && p<16) return (p-10)/6;
+    if(p>=16 && p<26) return 1-((p-16)/10)*1.25;
+    if(p>=26 && p<40) return -0.25*(1-(p-26)/14);
+    return 0;
+  }
+  function draw(now){
+    const dt = (now-t0)/16;
+    ctx.clearRect(0,0,w,h);
+    ctx.beginPath();
+    for(let x=0; x<=w; x+=2){
+      const v = spikeShape(x*0.6 - dt);
+      const y = h*0.6 - v*h*0.42;
+      if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.strokeStyle = '#e8a33d'; ctx.lineWidth = 1.4;
+    ctx.shadowColor = 'rgba(232,163,61,.6)'; ctx.shadowBlur = 4;
+    ctx.stroke();
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+/* ============================================================
+   MODULE 1 — neuron parts
+   ============================================================ */
+const partInfo = {
+  dendrites:{h:"Dendrites", p:"Short, branched extensions of the cell that receive nerve impulses (or stimuli) from other neurons or sensory receptors, and conduct them towards the cell body. Real dendrites branch repeatedly, increasing the surface area available to receive signals."},
+  spines:{h:"Dendritic spines", p:"Tiny protrusions along the dendrites, each typically forming the postsynaptic side of one synapse. They further increase surface area and can change shape with activity, which is thought to underlie some forms of learning and memory."},
+  soma:{h:"Cell body (soma)", p:"Contains the nucleus and the bulk of the neuron's organelles. Incoming signals from the dendrites are integrated (summed) here before reaching the axon hillock."},
+  nucleus:{h:"Nucleus", p:"Houses the neuron's DNA and directs the synthesis of proteins the neuron needs — including the ion-channel and neurotransmitter-related proteins used in signalling."},
+  nucleolus:{h:"Nucleolus", p:"A dense region inside the nucleus where ribosomal RNA is made and ribosomes are assembled — important given how much protein a neuron must produce and transport."},
+  rough_er:{h:"Rough endoplasmic reticulum", p:"A folded membrane system studded with ribosomes, where proteins (including membrane and secreted proteins such as receptors and channels) are synthesised and folded."},
+  golgi:{h:"Golgi apparatus", p:"Modifies, sorts and packages proteins made in the rough ER — for example, packaging neurotransmitter-handling proteins into vesicles for transport down the axon."},
+  mitochondria:{h:"Mitochondria", p:"Sites of aerobic respiration, producing the ATP a neuron needs — especially at the axon terminals, where ATP powers the active transport and vesicle recycling involved in synaptic transmission."},
+  hillock:{h:"Axon hillock", p:"The junction between the cell body and the axon. This is the trigger zone: if the summed depolarization here reaches threshold, an action potential is initiated and fired down the axon."},
+  myelin:{h:"Myelin sheath", p:"A fatty, insulating layer wrapped around the axon by Schwann cells (in the peripheral nervous system). It blocks ion leakage across the membrane it covers, forcing the impulse to regenerate only at the nodes of Ranvier — this is what makes saltatory conduction fast."},
+  schwann:{h:"Schwann cell nucleus", p:"Each myelin segment is formed by one Schwann cell wrapped repeatedly around the axon; its nucleus sits within that wrapping. Schwann cells also assist nerve regeneration after injury in the peripheral nervous system."},
+  node:{h:"Node of Ranvier", p:"A short gap between adjacent sections of myelin where the axon membrane is exposed. These nodes are packed with voltage-gated Na⁺ channels, so the action potential is regenerated here and appears to 'jump' from node to node."},
+  terminal:{h:"Axon terminal (synaptic bouton)", p:"The button-like ending of the axon. It contains mitochondria (for ATP) and stores neurotransmitter in vesicles; when an action potential arrives, it releases that neurotransmitter to pass the signal on."},
+  vesicles:{h:"Synaptic vesicles", p:"Small membrane-bound sacs inside the axon terminal that store neurotransmitter molecules, ready to fuse with the presynaptic membrane and release their contents when an impulse arrives."}
+};
+document.querySelectorAll('#neuronSVG .part').forEach(g=>{
+  g.addEventListener('click', ()=>{
+    document.querySelectorAll('#neuronSVG .part').forEach(o=>o.classList.remove('active'));
+    g.classList.add('active');
+    const d = partInfo[g.dataset.part];
+    const panel = document.getElementById('infoPanel');
+    panel.innerHTML = `<p class="ph">Selected structure</p><h3>${d.h}</h3><p>${d.p}</p>`;
+  });
+});
+
+/* ============================================================
+   MODULE 2 — conduction race
+   ============================================================ */
+(function(){
+  const dot1=document.getElementById('dot1'), dot2=document.getElementById('dot2');
+  const wake2=document.getElementById('wake2');
+  const t1=document.getElementById('t1'), t2=document.getElementById('t2');
+  const playBtn=document.getElementById('playBtn'), resetBtn=document.getElementById('resetBtn');
+  const speed=document.getElementById('speed'), result=document.getElementById('raceResult');
+  const nodePositions=[0.04,0.24,0.44,0.64,0.84,0.96];
+  let raf, running=false, startTime;
+  const MYELIN_DUR = 1400;
+  const CONT_DUR = 4200;
+
+  function reset(){
+    cancelAnimationFrame(raf); running=false;
+    dot1.style.left='4%'; dot2.style.left='4%'; wake2.style.width='0';
+    t1.textContent='0 ms'; t2.textContent='0 ms'; result.textContent='';
+  }
+  function posMyelin(frac){
+    const idx = Math.min(nodePositions.length-1, Math.floor(frac*nodePositions.length));
+    return nodePositions[idx];
+  }
+  function tick(now){
+    const mult = parseFloat(speed.value);
+    const elapsed = (now-startTime)*mult;
+    const f1 = Math.min(1, elapsed/MYELIN_DUR);
+    const f2 = Math.min(1, elapsed/CONT_DUR);
+    dot1.style.left = (posMyelin(f1)*100)+'%';
+    dot2.style.left = (4+f2*92)+'%';
+    wake2.style.width = (f2*92)+'%';
+    t1.textContent = Math.round(Math.min(elapsed,MYELIN_DUR))+' ms';
+    t2.textContent = Math.round(Math.min(elapsed,CONT_DUR))+' ms';
+    if(f1<1 || f2<1){ raf = requestAnimationFrame(tick); }
+    else{
+      running=false;
+      result.textContent = `Myelinated finished in ${MYELIN_DUR} ms (scaled) — about ${Math.round(CONT_DUR/MYELIN_DUR)}× faster than the unmyelinated axon.`;
+    }
+  }
+  playBtn.addEventListener('click', ()=>{
+    if(running) return;
+    reset(); running=true; startTime=performance.now();
+    raf=requestAnimationFrame(tick);
+  });
+  resetBtn.addEventListener('click', reset);
+})();
+
+/* ============================================================
+   MODULE 3 — action potential, stepped through phases
+   ============================================================ */
+(function(){
+  const canvas = document.getElementById('apCanvas');
+  const ctx = canvas.getContext('2d');
+  let W,H;
+  function fit(){
+    W = canvas.clientWidth; H = canvas.clientHeight;
+    canvas.width = W*devicePixelRatio; canvas.height = H*devicePixelRatio;
+    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  }
+  fit(); window.addEventListener('resize', ()=>{fit(); render(lastT, lastStim);});
+
+  const padL=54, padR=20, padT=20, padB=34;
+  const tMax = 220, vMin=-90, vMax=50;
+  function X(t){ return padL + (t/tMax)*(W-padL-padR); }
+  function Y(v){ return padT + (1-((v-vMin)/(vMax-vMin)))*(H-padT-padB); }
+
+  function baseGrid(){
+    ctx.clearRect(0,0,W,H);
+    ctx.strokeStyle='#22302c'; ctx.lineWidth=1; ctx.font='10.5px IBM Plex Mono, monospace';
+    [-90,-70,-55,-30,0,30,50].forEach(v=>{
+      const y=Y(v);
+      ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
+      ctx.fillStyle = v===-55 ? '#8a97a6' : '#5c6b68';
+      ctx.fillText(v+' mV', 4, y+3);
+    });
+    ctx.save(); ctx.setLineDash([4,3]); ctx.strokeStyle='#8a97a6';
+    ctx.beginPath(); ctx.moveTo(padL,Y(-55)); ctx.lineTo(W-padR,Y(-55)); ctx.stroke(); ctx.restore();
+    ctx.strokeStyle='#3a4a46';
+    ctx.beginPath(); ctx.moveTo(padL,padT); ctx.lineTo(padL,H-padB); ctx.lineTo(W-padR,H-padB); ctx.stroke();
+    ctx.fillStyle='#5c6b68'; ctx.fillText('time (ms)', W-padR-46, H-10);
+  }
+
+  function voltage(t, stimPct){
+    const t0=60, threshold=-55, restVal=-70;
+    if(t<t0) return restVal;
+    const dt = t-t0;
+    if(stimPct < 55){
+      const subPeak = restVal + (stimPct/100)*30;
+      if(dt<8) return restVal + (dt/8)*(subPeak-restVal);
+      const decay = Math.exp(-(dt-8)/20);
+      return restVal + (subPeak-restVal)*decay;
+    }
+    if(dt<4) return restVal + (dt/4)*(threshold-restVal);
+    if(dt<14) return threshold + ((dt-4)/10)*(40-threshold);
+    if(dt<30) return 40 - ((dt-14)/16)*(40-(-80));
+    if(dt<70) return -80 + ((dt-30)/40)*10;
+    return restVal;
+  }
+
+  let lastT=0, lastStim=0;
+  function render(t, stimPct){
+    lastT=t; lastStim=stimPct;
+    baseGrid();
+    if(t<=0) return;
+    ctx.beginPath(); ctx.strokeStyle='#e8a33d'; ctx.lineWidth=2.2;
+    ctx.shadowColor='rgba(232,163,61,.5)'; ctx.shadowBlur=6;
+    let first=true;
+    for(let tt=0; tt<=t; tt+=1){
+      const v=voltage(tt,stimPct), x=X(tt), y=Y(v);
+      if(first){ ctx.moveTo(x,y); first=false; } else ctx.lineTo(x,y);
+    }
+    ctx.stroke(); ctx.shadowBlur=0;
+    const vNow = voltage(t, stimPct);
+    ctx.beginPath(); ctx.fillStyle='#f2617a'; ctx.arc(X(t),Y(vNow),4,0,7); ctx.fill();
+  }
+  render(60,0);
+
+  /* ---- phase model ---- */
+  function buildPhases(stimPct){
+    const resting = {label:'Resting potential (−70 mV)', desc:'The inside of the neuron is negatively charged relative to the outside, at about <strong>−70 mV</strong>. This resting potential is maintained by the Na⁺/K⁺ pump — which actively moves 3 Na⁺ out for every 2 K⁺ in — and by the membrane being far more permeable to K⁺ than Na⁺ at rest. Both voltage-gated Na⁺ and K⁺ channels are closed.', tEnd:60, na:'closed', k:'closed', pump:'standby', naIn:0, kOut:0};
+    if(stimPct < 55){
+      return [
+        resting,
+        {label:'Sub-threshold (graded) potential', desc:`A weak stimulus (${stimPct}% strength) opens only a few Na⁺ channels. Some Na⁺ diffuses in down its concentration gradient, producing a small <strong>graded potential</strong> — but it never reaches the <strong>−55 mV threshold</strong>, so voltage-gated Na⁺ channels don't open in force and no action potential fires. This is the "nothing" half of the <strong>all-or-nothing principle</strong>.`, tEnd:120, na:'opening', k:'closed', pump:'standby', naIn:1, kOut:0},
+        {label:'Decays back to resting potential', desc:'With no action potential triggered, the few open Na⁺ channels close again and the small depolarization decays away as the membrane returns to <strong>−70 mV</strong>, ready for the next stimulus.', tEnd:180, na:'closed', k:'closed', pump:'standby', naIn:0, kOut:0}
+      ];
+    }
+    return [
+      resting,
+      {label:'Threshold reached (−55 mV)', desc:`A stimulus at ${stimPct}% strength opens a first few Na⁺ channels; Na⁺ diffuses in down its concentration gradient, making the inside less negative. Once enough Na⁺ has entered to depolarize the membrane to about <strong>−55 mV</strong> — the <strong>threshold</strong> — voltage-gated Na⁺ channels begin opening in large numbers.`, tEnd:64, na:'opening', k:'closed', pump:'standby', naIn:1, kOut:0},
+      {label:'Depolarization — positive feedback', desc:'Opening voltage-gated Na⁺ channels lets even more Na⁺ flood in, which depolarizes the membrane further, which opens still more Na⁺ channels — a <strong>positive feedback</strong> loop. This is <strong>depolarization</strong>: a rapid, large increase in positive charge inside the cell that reverses the membrane potential from negative to positive, peaking at about <strong>+40 mV</strong>.', tEnd:74, na:'open', k:'closed', pump:'standby', naIn:4, kOut:0},
+      {label:'Repolarization', desc:'At the peak of the action potential (+40 mV), voltage-gated Na⁺ channels close (inactivate) and voltage-gated K⁺ channels open. K⁺ now diffuses out of the neuron down its own concentration gradient. Because positive charge is leaving the cell, the membrane potential falls back towards negative — this is <strong>repolarization</strong>.', tEnd:90, na:'inactivated', k:'open', pump:'standby', naIn:4, kOut:4},
+      {label:'Hyperpolarization & refractory period', desc:'Voltage-gated K⁺ channels are slow to close, so K⁺ keeps leaving slightly too long. The inside briefly becomes even more negative than normal resting potential — an overshoot to about <strong>−80 mV</strong> called <strong>hyperpolarization</strong>. During this refractory period the neuron cannot fire another action potential, which keeps impulses discrete and travelling one way.', tEnd:130, na:'closed', k:'closing', pump:'standby', naIn:4, kOut:4},
+      {label:'Resting potential restored', desc:'K⁺ channels finish closing, and the <strong>Na⁺/K⁺ pump</strong> actively restores the original ion distribution — pumping 3 Na⁺ back out for every 2 K⁺ back in — returning the membrane to <strong>−70 mV</strong> so the neuron is ready to fire again.', tEnd:180, na:'closed', k:'closed', pump:'active', naIn:0, kOut:0}
+    ];
+  }
+
+  /* ---- membrane cross-section visual ---- */
+  const naGateRect=document.getElementById('naGateRect'), naPore=document.getElementById('naPore');
+  const kGateRect=document.getElementById('kGateRect'), kPore=document.getElementById('kPore');
+  const pumpGateRect=document.getElementById('pumpGateRect');
+  const naIons=document.querySelectorAll('#naIonsGrp .mion'), kIons=document.querySelectorAll('#kIonsGrp .mion');
+
+  function setMembraneVisual(ph){
+    const naOpenLike = ph.na==='opening' || ph.na==='open';
+    naGateRect.style.stroke = naOpenLike ? 'var(--na)' : 'var(--dim)';
+    naGateRect.style.filter = ph.na==='open' ? 'drop-shadow(0 0 6px var(--na))' : 'none';
+    naPore.style.opacity = ph.na==='open' ? 1 : (ph.na==='opening' ? .5 : 0);
+
+    const kOpenLike = ph.k==='open' || ph.k==='closing';
+    kGateRect.style.stroke = kOpenLike ? 'var(--k)' : 'var(--dim)';
+    kGateRect.style.filter = ph.k==='open' ? 'drop-shadow(0 0 6px var(--k))' : 'none';
+    kPore.style.opacity = ph.k==='open' ? 1 : (ph.k==='closing' ? .5 : 0);
+
+    pumpGateRect.style.stroke = ph.pump==='active' ? 'var(--muted)' : 'var(--dim)';
+    pumpGateRect.style.filter = ph.pump==='active' ? 'drop-shadow(0 0 6px var(--muted))' : 'none';
+
+    naIons.forEach(el=>{
+      const i = parseInt(el.dataset.i,10);
+      el.style.opacity = 1;
+      el.style.transform = i < ph.naIn ? 'translateY(150px)' : 'translateY(0)';
+    });
+    kIons.forEach(el=>{
+      const i = parseInt(el.dataset.i,10);
+      el.style.opacity = 1;
+      el.style.transform = i < ph.kOut ? 'translateY(-150px)' : 'translateY(0)';
+    });
+  }
+
+  const naCard=document.getElementById('naCard'), kCard=document.getElementById('kCard'), pumpCard=document.getElementById('pumpCard');
+  const naState=document.getElementById('naState'), naBar=document.getElementById('naBar');
+  const kState=document.getElementById('kState'), kBar=document.getElementById('kBar');
+  const pumpState=document.getElementById('pumpState'), pumpBar=document.getElementById('pumpBar');
+
+  function setChannelUI(naKey,kKey,pumpKey){
+    const naMap={closed:['Closed','var(--dim)','0%'], opening:['Opening…','var(--na)','40%'], open:['Open — Na⁺ influx','var(--na)','100%'], inactivated:['Inactivated (closed)','var(--dim)','0%']};
+    const kMap={closed:['Closed','var(--dim)','0%'], open:['Open — K⁺ efflux','var(--k)','100%'], closing:['Closing','var(--k)','45%']};
+    const pumpMap={standby:['Standing by','var(--muted)','20%'], active:['Actively restoring gradients (3 Na⁺ out : 2 K⁺ in)','var(--muted)','100%']};
+    const [nt,nc,nw]=naMap[naKey]; naState.textContent=nt; naState.style.color=nc; naBar.style.width=nw; naBar.style.background=nc==='var(--dim)'?'var(--dim)':'var(--na)';
+    const [kt,kc,kw]=kMap[kKey]; kState.textContent=kt; kState.style.color=kc; kBar.style.width=kw; kBar.style.background=kc==='var(--dim)'?'var(--dim)':'var(--k)';
+    const [pt,pc,pw]=pumpMap[pumpKey]; pumpState.textContent=pt; pumpState.style.color=pc; pumpBar.style.width=pw;
+    naCard.style.color = naKey==='closed'||naKey==='inactivated' ? 'var(--dim)' : 'var(--na)';
+    kCard.style.color = kKey==='closed' ? 'var(--dim)' : 'var(--k)';
+  }
+
+  let phases=[], curIdx=-1, stimPctFired=0, playTimer=null, drawRaf=null;
+  const phaseCount=document.getElementById('phaseCount'), phaseTitle=document.getElementById('phaseTitle'), phaseDesc=document.getElementById('phaseDesc');
+  const apPrev=document.getElementById('apPrev'), apNext=document.getElementById('apNext'), apPlay=document.getElementById('apPlay');
+
+  function updateButtons(){
+    apPrev.disabled = curIdx<=0;
+    apNext.disabled = curIdx>=phases.length-1 || phases.length===0;
+    apPlay.disabled = phases.length===0 || curIdx>=phases.length-1;
+  }
+
+  function showPhase(idx, animate){
+    curIdx = idx;
+    const ph = phases[idx];
+    const prevEnd = idx>0 ? phases[idx-1].tEnd : 0;
+    phaseCount.textContent = `Phase ${idx+1} / ${phases.length}`;
+    phaseTitle.textContent = ph.label;
+    phaseDesc.innerHTML = ph.desc;
+    setChannelUI(ph.na, ph.k, ph.pump);
+    setMembraneVisual(ph);
+    updateButtons();
+    cancelAnimationFrame(drawRaf);
+    if(animate){
+      const start = performance.now(); const dur = 850;
+      function step(now){
+        const p = Math.min(1,(now-start)/dur);
+        const t = prevEnd + p*(ph.tEnd-prevEnd);
+        render(t, stimPctFired);
+        if(p<1) drawRaf = requestAnimationFrame(step);
+      }
+      drawRaf = requestAnimationFrame(step);
+    } else {
+      render(ph.tEnd, stimPctFired);
+    }
+  }
+
+  const stim = document.getElementById('stim'), stimVal = document.getElementById('stimVal');
+  stim.addEventListener('input', ()=> stimVal.textContent = stim.value+'%');
+
+  document.getElementById('fireBtn').addEventListener('click', ()=>{
+    clearInterval(playTimer);
+    stimPctFired = parseFloat(stim.value);
+    phases = buildPhases(stimPctFired);
+    showPhase(0,false);
+  });
+  document.getElementById('apReset').addEventListener('click', ()=>{
+    clearInterval(playTimer); cancelAnimationFrame(drawRaf);
+    phases=[]; curIdx=-1; render(60,0);
+    phaseCount.textContent='Phase 1 / 3'; phaseTitle.textContent='Resting potential';
+    phaseDesc.textContent='Set a stimulus strength above and press Stimulate to begin.';
+    setChannelUI('closed','closed','standby');
+    setMembraneVisual({na:'closed', k:'closed', pump:'standby', naIn:0, kOut:0});
+    updateButtons();
+  });
+  apNext.addEventListener('click', ()=>{ if(curIdx<phases.length-1) showPhase(curIdx+1,true); });
+  apPrev.addEventListener('click', ()=>{ if(curIdx>0) showPhase(curIdx-1,false); });
+  apPlay.addEventListener('click', ()=>{
+    clearInterval(playTimer);
+    playTimer = setInterval(()=>{
+      if(curIdx<phases.length-1){ showPhase(curIdx+1,true); }
+      else{ clearInterval(playTimer); }
+    }, 3200);
+  });
+  updateButtons();
+  setMembraneVisual({na:'closed', k:'closed', pump:'standby', naIn:0, kOut:0});
+})();
+
+/* ============================================================
+   MODULE 4 — synapse step-through (slower, more detailed)
+   ============================================================ */
+(function(){
+  const steps = [
+    {t:"Action potential arrives", b:"An action potential travels down the axon and depolarizes the presynaptic membrane at the axon terminal. The terminal is rich in mitochondria (which supply ATP for vesicle transport and recycling) and contains many synaptic vesicles — some already docked at the membrane, others held in reserve further back."},
+    {t:"Voltage-gated Ca²⁺ channels open", b:"Depolarization opens voltage-gated calcium channels in the presynaptic membrane. Because Ca²⁺ is far more concentrated outside the cell, it diffuses in down its electrochemical gradient, raising the Ca²⁺ concentration inside the terminal."},
+    {t:"Vesicles move to the membrane and fuse", b:"The rise in intracellular Ca²⁺ mobilises reserve-pool vesicles towards the membrane, while the already-docked vesicles fuse with the presynaptic membrane and release their contents (exocytosis) — an ATP-dependent process."},
+    {t:"Neurotransmitter diffuses across the cleft", b:"Neurotransmitter molecules empty into the synaptic cleft and diffuse, down their concentration gradient, across the roughly 20 nm gap to the postsynaptic membrane. This diffusion step is what makes synaptic transmission slightly slower than conduction along an axon."},
+    {t:"Neurotransmitter binds to receptors", b:"Neurotransmitter binds to specific receptor proteins on ligand-gated Na⁺ channels in the postsynaptic membrane. Binding changes the channel's shape, opening a pore that lets Na⁺ enter and depolarize the postsynaptic cell — an excitatory postsynaptic potential (EPSP)."},
+    {t:"Signal is terminated", b:"Neurotransmitter is cleared from the cleft — broken down by an enzyme (for example, acetylcholinesterase) and/or taken back into the presynaptic neuron by reuptake transporters — so the synapse resets and is ready to respond to the next impulse."}
+  ];
+  let cur=0;
+  const svg = document.getElementById('synapseSVG');
+  const stepBtnWrap = document.getElementById('stepButtons');
+  steps.forEach((s,i)=>{
+    const b=document.createElement('button');
+    b.textContent = (i+1);
+    b.title=s.t;
+    b.addEventListener('click', ()=>goTo(i));
+    stepBtnWrap.appendChild(b);
+  });
+
+  function goTo(i){
+    cur = Math.max(0, Math.min(steps.length-1, i));
+    svg.className.baseVal = 'step-'+(cur+1);
+    document.getElementById('synPh').textContent = `Step ${cur+1} / ${steps.length}`;
+    document.getElementById('synTitle').textContent = steps[cur].t;
+    document.getElementById('synBody').textContent = steps[cur].b;
+    [...stepBtnWrap.children].forEach((b,i)=>{
+      b.classList.toggle('active', i===cur);
+      b.classList.toggle('done', i<cur);
+    });
+    applyStepVisuals(cur);
+  }
+
+  function ionsByRole(role){ return document.querySelectorAll(`.ion[data-role="${role}"]`); }
+
+  function applyStepVisuals(i){
+    const ca = ionsByRole('ca'), nt = ionsByRole('nt'), na = ionsByRole('na');
+    const preMem = document.getElementById('preMembrane');
+    const postMem = document.getElementById('postMembrane');
+    const dockedVesicles = document.querySelectorAll('#vesicles .vesicle');
+    const reserveVesicles = document.querySelectorAll('#reserveVesicles .vesicle');
+    const receptors = document.querySelectorAll('#receptors rect');
+    const caCh = document.querySelectorAll('#caChannels rect');
+    const enzyme = document.getElementById('enzyme');
+
+    // reset
+    ca.forEach(el=>{el.style.opacity=0; el.style.transform='translateY(0)';});
+    nt.forEach(el=>{el.style.opacity=0; el.style.transform='translateY(0)';});
+    na.forEach(el=>{el.style.opacity=0; el.style.transform='translateY(0)';});
+    dockedVesicles.forEach(v=>{v.style.opacity=1; v.style.transform='translateY(0)';});
+    reserveVesicles.forEach(v=>{v.style.opacity=1; v.style.transform='translateY(0)';});
+    preMem.style.stroke='#4a5a54'; preMem.style.filter='none';
+    postMem.style.stroke='#4a5a54'; postMem.style.filter='none';
+    receptors.forEach(r=>{r.style.stroke='var(--nt)'; r.style.filter='none';});
+    caCh.forEach(r=>{r.style.stroke='var(--ca)'; r.style.filter='none';});
+    enzyme.style.opacity=0;
+
+    if(i===0){
+      preMem.style.stroke='var(--na)'; preMem.style.filter='drop-shadow(0 0 5px var(--na))';
+    }
+    if(i===1){
+      preMem.style.stroke='var(--na)';
+      caCh.forEach(r=>{r.style.filter='drop-shadow(0 0 5px var(--ca))';});
+      ca.forEach(el=>{el.style.opacity=1; el.style.transform='translateY(95px)';});
+    }
+    if(i===2){
+      ca.forEach(el=>{el.style.opacity=1; el.style.transform='translateY(155px)';});
+      reserveVesicles.forEach(v=>{v.style.transform='translateY(20px) translateX(40px)'; v.style.opacity=.5;});
+      dockedVesicles.forEach(v=>{v.style.opacity=.35; v.style.transform='translateY(8px) scale(0.6)';});
+    }
+    if(i===3){
+      reserveVesicles.forEach(v=>{v.style.opacity=.15;});
+      dockedVesicles.forEach(v=>{v.style.opacity=.12;});
+      nt.forEach(el=>{el.style.opacity=1; el.style.transform='translateY(70px)';});
+    }
+    if(i===4){
+      reserveVesicles.forEach(v=>{v.style.opacity=.1;});
+      dockedVesicles.forEach(v=>{v.style.opacity=.08;});
+      nt.forEach(el=>{el.style.opacity=1; el.style.transform='translateY(78px)';});
+      receptors.forEach(r=>{r.style.filter='drop-shadow(0 0 6px var(--nt))';});
+      na.forEach(el=>{el.style.opacity=1; el.style.transform='translateY(-22px)';});
+      postMem.style.stroke='var(--na)'; postMem.style.filter='drop-shadow(0 0 5px var(--na))';
+    }
+    if(i===5){
+      nt.forEach(el=>{el.style.opacity=0;});
+      na.forEach(el=>{el.style.opacity=1; el.style.transform='translateY(-45px)';});
+      enzyme.style.opacity=1;
+    }
+  }
+
+  document.getElementById('prevStep').addEventListener('click', ()=>goTo(cur-1));
+  document.getElementById('nextStep').addEventListener('click', ()=>goTo(cur+1));
+  document.getElementById('resetSyn').addEventListener('click', ()=>goTo(0));
+  document.getElementById('playSyn').addEventListener('click', ()=>{
+    let i=0; goTo(0);
+    const iv = setInterval(()=>{
+      i++;
+      if(i>=steps.length){ clearInterval(iv); return; }
+      goTo(i);
+    }, 3800);
+  });
+
+  goTo(0);
+})();
+</script>
+</body>
+</html>
